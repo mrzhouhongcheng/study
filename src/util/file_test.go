@@ -7,7 +7,7 @@ import (
 )
 
 func TestIsFile(t *testing.T) {
-	path := "../../test.js"
+	path := "../../test/test.js"
 	res, err := IsFile(path)
 	if err != nil {
 		t.Fatal(err)
