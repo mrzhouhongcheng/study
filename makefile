@@ -3,3 +3,6 @@ run:
 
 build:
 	go build -o data_recovery main.go 
+
+test:
+	go test ./...
