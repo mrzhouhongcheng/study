@@ -1,6 +1,9 @@
 package util
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestIsFile(t *testing.T) {
 	path := "../../test.js"
@@ -14,8 +17,8 @@ func TestIsFile(t *testing.T) {
 }
 
 func TestIsDir(t *testing.T) {
-	path := "../";
-	res, err := IsDir(path);
+	path := "../"
+	res, err := IsDir(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,3 +27,11 @@ func TestIsDir(t *testing.T) {
 	}
 }
 
+func TestCalculateFileHash(t *testing.T) {
+	path := "../../test/test.js"
+	hash, err := CalculateFileHash(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(hash)
+}

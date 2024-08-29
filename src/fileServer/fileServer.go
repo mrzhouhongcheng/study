@@ -32,6 +32,7 @@ func Merge(path string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	index := 1
 	for {
 		n, err := file.Read(buf)
@@ -46,13 +47,7 @@ func Merge(path string) error {
 			break
 		}
 		newFilePath := file_name + ".part" + strconv.Itoa(index)
-
 		newFilePath = filepath.Join(filepath.Dir(path), newFilePath)
-		/* temFile, err := os.Create(newFilePath)
-		if err != nil {
-			log.Println("创建切割文件出错", err)
-			return err
-		} */
 		err = os.WriteFile(newFilePath, buf[:n], os.ModePerm)
 		if err != nil {
 			log.Println("write new file failed, ", err)
