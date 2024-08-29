@@ -19,7 +19,7 @@ func TestMerge2(t *testing.T) {
 }
 
 func TestMergeFilder(t *testing.T) {
-
+	t.Skip("skipping Test TestMergeFilder for now. because this folder does not exist")
 	err := MergeFilder("../../test/jdk-8u361-windows-x64.exe")
 
 	if err != nil {
