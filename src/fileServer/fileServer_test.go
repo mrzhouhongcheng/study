@@ -17,3 +17,12 @@ func TestMerge2(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestMergeFilder(t *testing.T) {
+
+	err := MergeFilder("../../test/jdk-8u361-windows-x64.exe")
+
+	if err != nil {
+		t.Error(err)
+	}
+}

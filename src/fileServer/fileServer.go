@@ -58,6 +58,30 @@ func Merge(path string) error {
 	return nil
 }
 
+type DownJson struct {
+	FolderName string   `json:"folderName"`
+	HashKey    string   `json:"hashKey"`
+	FileList   []string `json:"fileList"`
+}
+
+// 传入一个文件路径, 如果它是一个文件, 则创建一个对应的临时文件夹; 文件夹的名字是UUID生成的
+// 复制这个文件到文件夹中, 对它进行分割;
+// 将对应的文件夹路径uuid; 和对应的文件hashKey添加到一个JSON文件中
+// 写入JSON文件, 文件名叫做down.json
+// 需要下载文件 同时也需要写入到JSON文件当中;
+func MergeFilder(path string) error {
+	if !util.IsFileNotError(path) {
+		log.Println("path is not a file")
+		return errors.New("path is not a file, MergeFilder failed")
+	}
+	dirPath := filepath.Dir(path)
+	uuid := util.GenerageUUID()
+	targetPath := filepath.Join(dirPath, uuid, filepath.Base(path))
+	util.CopyFile(path, targetPath)
+
+	return nil
+}
+
 // 指定一个文件, 如果文件 > 10mb 那么就对这个文件进行切割;
 // 如果文件不大于10mb; 那么就分割成一个文件
 func Split(path string) error {
