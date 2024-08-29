@@ -111,3 +111,25 @@ func CopyFile(sourcePath, targetPath string) error {
 	}
 	return nil
 }
+
+// 写入一个文件, 如果文件存在, 那么就删除这个文件,
+// 如果文件不存在, 那么就创建一个文件
+func WriteFile(filePath string, data []byte) error {
+	// 判断文件是否存在
+	if FileExists(filePath) {
+		os.Remove(filePath)
+	}
+	// 获取他的父目录地址
+	dirPath := filepath.Dir(filePath)
+	err := os.MkdirAll(dirPath, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.Write(data)
+	return err
+}

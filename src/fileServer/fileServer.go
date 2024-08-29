@@ -1,6 +1,7 @@
 package fileserver
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -11,18 +12,18 @@ import (
 	"com.zhouhc.study/src/util"
 )
 
-func Merge(path string) error {
+func Merge(path string) ([]string, error) {
 	// 如果路径不是一个文件, 那么就返回err
 	isFile, err := util.IsFile(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !isFile {
-		return errors.New("path is not a file ")
+		return nil, errors.New("path is not a file ")
 	}
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	file_name := fileInfo.Name()
 	log.Println("file name is ", file_name)
@@ -30,10 +31,11 @@ func Merge(path string) error {
 	var buf = make([]byte, 1024*1024*10)
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer file.Close()
 	index := 1
+	var res []string = make([]string, 0)
 	for {
 		n, err := file.Read(buf)
 		if err != nil {
@@ -41,7 +43,7 @@ func Merge(path string) error {
 				break
 			}
 			log.Println("读取文件出错", err)
-			return err
+			return nil, err
 		}
 		if n <= 0 {
 			break
@@ -51,17 +53,26 @@ func Merge(path string) error {
 		err = os.WriteFile(newFilePath, buf[:n], os.ModePerm)
 		if err != nil {
 			log.Println("write new file failed, ", err)
-			return err
+			return nil, err
 		}
 		index += 1
+		res = append(res, newFilePath)
 	}
-	return nil
+	return res, nil
 }
 
 type DownJson struct {
 	FolderName string   `json:"folderName"`
 	HashKey    string   `json:"hashKey"`
 	FileList   []string `json:"fileList"`
+}
+
+func NewDownJons(uuid, hashKey string, fileList []string) *DownJson {
+	return &DownJson{
+		FolderName: uuid,
+		HashKey:    hashKey,
+		FileList:   fileList,
+	}
 }
 
 // 传入一个文件路径, 如果它是一个文件, 则创建一个对应的临时文件夹; 文件夹的名字是UUID生成的
@@ -79,7 +90,19 @@ func MergeFilder(path string) error {
 	targetPath := filepath.Join(dirPath, uuid, filepath.Base(path))
 	util.CopyFile(path, targetPath)
 
-	return nil
+	// 计算文件的hash值
+	hashKey, _ := util.CalculateFileHash(targetPath)
+	fileList, err := Merge(targetPath)
+	if err != nil {
+		return nil
+	}
+	downjson := NewDownJons(uuid, hashKey, fileList)
+	data, err := json.Marshal(downjson)
+	if err != nil {
+		return err
+	}
+	// 写入json到down.json中
+	return util.WriteFile(filepath.Join(filepath.Dir(targetPath), "down.json"), data)
 }
 
 // 指定一个文件, 如果文件 > 10mb 那么就对这个文件进行切割;

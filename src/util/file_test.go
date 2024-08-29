@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsFile(t *testing.T) {
@@ -59,4 +61,12 @@ func TestCopyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Remove(targetPath)
+}
+
+
+func TestWriteFile(t *testing.T) {
+	path := "../../test/write.txt"
+	err := WriteFile(path, []byte("hello world"))
+	assert.True(t, err == nil, "write file failed")
+	os.Remove(path)
 }
