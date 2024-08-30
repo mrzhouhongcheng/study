@@ -25,9 +25,10 @@ func TestMerge2(t *testing.T) {
 }
 
 func TestMergeFilder(t *testing.T) {
-	err := MergeFilder("../../test/test.js")
+	uuid, err := MergeFilder("../../test/test.js")
 
 	if err != nil {
 		t.Error(err)
 	}
+	assert.True(t, uuid != "")
 }

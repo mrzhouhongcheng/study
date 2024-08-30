@@ -1,15 +1,83 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	fileserver "com.zhouhc.study/src/fileServer"
+	"com.zhouhc.study/src/util"
 )
 
-func main() {
+// 如果需要下载, 第一步就是先对文件进行分割, 下载一个down.json文件, 这个文件的内容可以作为响应的结果进行返回
+// 定义传入的参数:
+// 传入的参数是这个http的下载地址. 但是两个是不同的路径;
+// 需要启动两个服务, 一个是httpFIleServer, 一个是其他的关联程序, 两个监听的地址是不一样的
+// 文件服务器监听的地址是8888
+// 现在服务器监听的地址是8889
+// 传入的参数就是文件服务器的下载地址
 
-	fileServer := http.FileServer(http.Dir("./"))
-	
-	http.Handle("/", fileServer)
-	if err := http.ListenAndServe(":8888", nil); err != nil {
-		panic(err)
+func startFTP() {
+	go func() {
+		fileServer := http.FileServer(http.Dir("./"))
+		http.Handle("/", fileServer)
+		if err := http.ListenAndServe(":8888", nil); err != nil {
+			panic(err)
+		}
+	}()
+}
+
+func downHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
 	}
+	var params = make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&params)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	// 判断是否存在filePath这个请求参数
+	filePath, ok := params["filePath"]
+	if !ok {
+		http.Error(w, "Missing filePath parameter", http.StatusBadRequest)
+		return
+	}
+	// 对文件进行解析
+	// 截取到:8888后面的字符串
+	filePath = "." + filePath[strings.Index(filePath, ":8888")+5:]
+
+	// 然后打印这个参数
+	fmt.Println("filepath", filePath)
+	if !util.IsFileNotError(filePath) {
+		http.Error(w, "传入的地址不是一个文件路径", http.StatusBadRequest)
+		return
+	}
+	uuid, err := fileserver.MergeFilder(filePath)
+	if err != nil {
+		http.Error(w, "Invalid file path", http.StatusInternalServerError)
+		return
+	}
+
+	// 读取一个文件
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(filePath), uuid, "down.json"))
+	if err != nil {
+		http.Error(w, "read down json file is error", http.StatusInternalServerError)
+		return
+	}
+	w.Write([]byte(data))
+}
+
+func main() {
+	startFTP()
+
+	http.HandleFunc("/down", downHandler)
+
+	log.Fatal(http.ListenAndServe(":8889", nil))
+
 }

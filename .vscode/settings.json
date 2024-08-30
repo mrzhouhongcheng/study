@@ -1,3 +1,9 @@
 {
-    "makefile.configureOnOpen": true
+    "makefile.configureOnOpen": true,
+    "vim.handleKeys": {
+        
+        "<C-d>": true,
+        "<C-s>": false,
+        "<C-z>": false
+    }
 }

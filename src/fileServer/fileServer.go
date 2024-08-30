@@ -82,10 +82,10 @@ func NewDownJons(uuid, hashKey, fileName string, fileList []string) *DownJson {
 // 将对应的文件夹路径uuid; 和对应的文件hashKey添加到一个JSON文件中
 // 写入JSON文件, 文件名叫做down.json
 // 需要下载文件 同时也需要写入到JSON文件当中;
-func MergeFilder(path string) error {
+func MergeFilder(path string) (string, error) {
 	if !util.IsFileNotError(path) {
 		log.Println("path is not a file")
-		return errors.New("path is not a file, MergeFilder failed")
+		return "", errors.New("path is not a file, MergeFilder failed")
 	}
 	dirPath := filepath.Dir(path)
 	uuid := util.GenerageUUID()
@@ -96,15 +96,15 @@ func MergeFilder(path string) error {
 	hashKey, _ := util.CalculateFileHash(targetPath)
 	fileList, err := Merge(targetPath)
 	if err != nil {
-		return nil
+		return "", err
 	}
 	downjson := NewDownJons(uuid, hashKey, filepath.Base(targetPath), fileList)
 	data, err := json.Marshal(downjson)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// 写入json到down.json中
-	return util.WriteFile(filepath.Join(filepath.Dir(targetPath), "down.json"), data)
+	return uuid, util.WriteFile(filepath.Join(filepath.Dir(targetPath), "down.json"), data)
 }
 
 // 指定一个文件, 如果文件 > 10mb 那么就对这个文件进行切割;
