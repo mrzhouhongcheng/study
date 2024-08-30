@@ -62,13 +62,15 @@ func Merge(path string) ([]string, error) {
 }
 
 type DownJson struct {
+	FileName   string   `json:"fileName"`
 	FolderName string   `json:"folderName"`
 	HashKey    string   `json:"hashKey"`
 	FileList   []string `json:"fileList"`
 }
 
-func NewDownJons(uuid, hashKey string, fileList []string) *DownJson {
+func NewDownJons(uuid, hashKey, fileName string, fileList []string) *DownJson {
 	return &DownJson{
+		FileName:   fileName,
 		FolderName: uuid,
 		HashKey:    hashKey,
 		FileList:   fileList,
@@ -96,7 +98,7 @@ func MergeFilder(path string) error {
 	if err != nil {
 		return nil
 	}
-	downjson := NewDownJons(uuid, hashKey, fileList)
+	downjson := NewDownJons(uuid, hashKey, filepath.Base(targetPath), fileList)
 	data, err := json.Marshal(downjson)
 	if err != nil {
 		return err
