@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 	"com.zhouhc.study/src/util"
 )
 
-func Merge(path string) ([]string, error) {
+func Split(path string) ([]string, error) {
 	// 如果路径不是一个文件, 那么就返回err
 	isFile, err := util.IsFile(path)
 	if err != nil {
@@ -82,7 +83,7 @@ func NewDownJons(uuid, hashKey, fileName string, fileList []string) *DownJson {
 // 将对应的文件夹路径uuid; 和对应的文件hashKey添加到一个JSON文件中
 // 写入JSON文件, 文件名叫做down.json
 // 需要下载文件 同时也需要写入到JSON文件当中;
-func MergeFilder(path string) (string, error) {
+func SplitFilder(path string) (string, error) {
 	if !util.IsFileNotError(path) {
 		log.Println("path is not a file")
 		return "", errors.New("path is not a file, MergeFilder failed")
@@ -94,7 +95,7 @@ func MergeFilder(path string) (string, error) {
 
 	// 计算文件的hash值
 	hashKey, _ := util.CalculateFileHash(targetPath)
-	fileList, err := Merge(targetPath)
+	fileList, err := Split(targetPath)
 	if err != nil {
 		return "", err
 	}
@@ -107,8 +108,70 @@ func MergeFilder(path string) (string, error) {
 	return uuid, util.WriteFile(filepath.Join(filepath.Dir(targetPath), "down.json"), data)
 }
 
-// 指定一个文件, 如果文件 > 10mb 那么就对这个文件进行切割;
-// 如果文件不大于10mb; 那么就分割成一个文件
-func Split(path string) error {
+// 合并文件
+// 传入一个文件夹路径, 然后读取这个文件夹中的down.json文件
+// 根据down.json文件, 创建一个fileName文件
+// 根据down.json文件中的fileList, 依次将内容写入到fileName文件中
+// 校验文件的hashKey编码
+// 如果传入的不是一个文件夹, 则报错
+// 如果文件夹路径下没有down.json文件, 则报错
+// 如果没有找到fileList中相对应的分片文件, 则报错
+// 如果hashKey不匹配, 则报错
+func Merge(path string) error {
+	// 判断传入的路径是否是一个文件夹
+	if !util.IsDirNotError(path) {
+		return errors.New("path is not a directory")
+	}
+	// 读取down.json
+	downJson, err := getDownjsonByPath(path)
+	if err != nil {
+		return err
+	}
+	filePath := filepath.Join(path, downJson.FileName)
+	if util.FileExists(filePath) {
+		os.Remove(filePath)
+	}
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	for _, val := range downJson.FileList {
+		partName := filepath.Base(val)
+		partFile, err := os.Open(filepath.Join(path, partName))
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(file, partFile)
+		if err != nil {
+			return err
+		}
+		partFile.Close()
+	}
 	return nil
+}
+
+func getDownjsonByPath(path string) (*DownJson, error) {
+
+	data, err := os.ReadFile(filepath.Join(path, "down.json"))
+	if err != nil {
+		return nil, err
+	}
+	var res DownJson
+	return &res, json.Unmarshal(data, &res)
+}
+
+// 文件下载.
+func DownPartFile(partFileUrl, outPath string) error {
+	res, err := http.Get(partFileUrl)
+	if err != nil {
+		return nil
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil
+	}
+	return util.WriteFile(outPath, data)
 }

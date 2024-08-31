@@ -58,7 +58,7 @@ func downHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "传入的地址不是一个文件路径", http.StatusBadRequest)
 		return
 	}
-	uuid, err := fileserver.MergeFilder(filePath)
+	uuid, err := fileserver.SplitFilder(filePath)
 	if err != nil {
 		http.Error(w, "Invalid file path", http.StatusInternalServerError)
 		return
