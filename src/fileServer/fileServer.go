@@ -123,7 +123,7 @@ func Merge(path string) error {
 		return errors.New("path is not a directory")
 	}
 	// 读取down.json
-	downJson, err := getDownjsonByPath(path)
+	downJson, err := GetDownjsonByPath(path)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func Merge(path string) error {
 	return nil
 }
 
-func getDownjsonByPath(path string) (*DownJson, error) {
+func GetDownjsonByPath(path string) (*DownJson, error) {
 
 	data, err := os.ReadFile(filepath.Join(path, "down.json"))
 	if err != nil {
