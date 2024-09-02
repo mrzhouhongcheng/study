@@ -6,3 +6,12 @@ Content-Type: application/json
 {
     "filePath": "http://127.0.0.1:8888/src/fileServer/fileServer.go"
 }
+
+### 请求1
+POST http://localhost:8889/down
+Content-Type: application/json
+
+{
+    "filePath": "http://localhost:8888/test.http"
+}
+
