@@ -17,7 +17,7 @@ import (
 
 func main() {
 
-	checkJsonPath := flag.String("f", "", "指定down.json文件，下载数据")
+	checkJsonPath := flag.String("f", "", "指定down.json文件,下载数据")
 	url := flag.String("d", "", "指定文件下载的url地址")
 	output := flag.String("o", "", "指定文件的下载路径")
 	flag.Parse()
