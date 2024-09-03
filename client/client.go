@@ -81,10 +81,13 @@ func checkParts(dwPath, output string) error {
 		return err
 	}
 	var wg sync.WaitGroup
+	resChan := make(chan string, 20)
 	for _, path := range downJson.FileList {
+		resChan <- path
 		wg.Add(1)
 		go func(outDir, _path string) {
 			defer wg.Done()
+			defer func() { <-resChan }()
 			// 获取文件在本地的路径
 			part_path := filepath.Join(outDir, filepath.Base(_path))
 			if !util.FileExists(part_path) {
