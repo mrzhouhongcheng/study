@@ -121,7 +121,9 @@ func checkParts(dwPath, output string) error {
 		log.Printf("文件校验失败: 计算结果: %s, 期待结果: %s\n", code, downJson.HashKey)
 		return errors.New("hash key not supported")
 	}
+	log.Printf("文件校验成功: %s\n", code)
 	// 删除文件夹中的down.json和part文件
+	log.Printf("清理down.json 和 临时文件")
 	removeDownInfo(dwPath, output, removeServerTempFile)
 	return nil
 }

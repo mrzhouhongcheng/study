@@ -80,7 +80,7 @@ func Split(path, output string) ([]string, error) {
 			if err != nil {
 				log.Println("write new file failed, ", err)
 			}
-		}(buf[:n], newFilePath)
+		}(append([]byte(nil), buf[:n]...), newFilePath)
 		index += 1
 		res = append(res, newFilePath)
 	}
