@@ -29,7 +29,7 @@ func main() {
 	}
 	if *url != "" {
 		err := downJSON(*url, *output)
-		dwPath := *output
+		dwPath := filepath.Join(*output, "down.json")
 		if err != nil {
 			fmt.Printf("%v\n", err)
 			os.Exit(1)
@@ -43,7 +43,7 @@ func main() {
 	}
 
 	if *checkJsonPath != "" {
-		err := checkParts(*checkJsonPath, *output)
+		err := checkParts(filepath.Join(*checkJsonPath, "down.json"), *output)
 		if err != nil {
 			fmt.Printf("checkParts failed: %v\n", err)
 			os.Exit(1)
@@ -121,7 +121,7 @@ func removeDownInfo(dwpath, output string) error {
 		return err
 	}
 	// 删除json文件
-	os.Remove(filepath.Join(dwpath, "down.json"))
+	os.Remove(dwpath)
 	for _, path := range downJson.FileList {
 		os.Remove(filepath.Join(output, filepath.Base(path)))
 	}

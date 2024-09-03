@@ -119,7 +119,7 @@ func SplitFilder(path string) (string, error) {
 // 如果hashKey不匹配, 则报错
 func Merge(dwPath, output string) error {
 	// 判断传入的路径是否是一个文件夹
-	if dwPath != "" && !util.IsDirNotError(dwPath) {
+	if dwPath != "" && !util.IsFileNotError(dwPath) {
 		return errors.New("path is not a directory")
 	}
 	// 读取down.json
@@ -153,8 +153,7 @@ func Merge(dwPath, output string) error {
 }
 
 func GetDownjsonByPath(path string) (*DownJson, error) {
-
-	data, err := os.ReadFile(filepath.Join(path, "down.json"))
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

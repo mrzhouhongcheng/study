@@ -34,6 +34,6 @@ func TestSplitFilder(t *testing.T) {
 }
 
 func TestMerge(t *testing.T) {
-	err := Merge("../../test/mergetest/8d616f67-dc25-41a7-a102-752d66aaffb7", "../../test/mergetest/8d616f67-dc25-41a7-a102-752d66aaffb7")
+	err := Merge("../../test/mergetest/8d616f67-dc25-41a7-a102-752d66aaffb7/down.json", "../../test/mergetest/8d616f67-dc25-41a7-a102-752d66aaffb7")
 	assert.True(t, err == nil)
 }
