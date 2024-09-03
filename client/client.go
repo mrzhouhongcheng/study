@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	fileserver "com.zhouhc.study/src/fileServer"
 	"com.zhouhc.study/src/util"
@@ -79,18 +80,26 @@ func checkParts(dwPath, output string) error {
 		fmt.Printf("Get down.json failed: %v\n", err)
 		return err
 	}
+	var wg sync.WaitGroup
 	for _, path := range downJson.FileList {
-		// 获取文件在本地的路径
-		part_path := filepath.Join(output, filepath.Base(path))
-		if !util.FileExists(part_path) {
-			url := fmt.Sprintf("http://localhost:8889/downpart?part=%s", path)
-			err = getFileByUrl(url, part_path)
-			if err != nil {
-				fmt.Println("Error getting file from URL: ", err)
-				return err
+		wg.Add(1)
+		go func(outDir, _path string) {
+			defer wg.Done()
+			// 获取文件在本地的路径
+			part_path := filepath.Join(outDir, filepath.Base(_path))
+			if !util.FileExists(part_path) {
+				url := fmt.Sprintf("http://localhost:8889/downpart?part=%s", _path)
+				err = getFileByUrl(url, part_path+".tmp")
+				if err != nil {
+					fmt.Println("Error getting file from URL: ", err)
+					return
+				}
+				fmt.Printf("remove file: %s \t %s\n", part_path+".tmp", part_path)
+				os.Rename(part_path+".tmp", part_path)
 			}
-		}
+		}(output, path)
 	}
+	wg.Wait()
 	// 合并文件
 	err = fileserver.Merge(dwPath, output)
 	if err != nil {
