@@ -121,7 +121,7 @@ func SplitFilder(path string) (string, error) {
 	os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
 
 	// 计算文件的hash值
-	log.Printf("calculating file hash...\n")
+	log.Printf("calculating file: {%s} hash...\n", path)
 	hashKey, _ := util.CalculateFileHash(path)
 	log.Printf("current file hash key is %s \n", hashKey)
 	fileList, err := Split(path, filepath.Dir(targetPath))

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -109,6 +110,7 @@ func checkParts(dwPath, output string) error {
 		fmt.Printf("Merge file failed: %v\n", err)
 		return err
 	}
+	log.Printf("校验文件:%s\n", filepath.Join(output, downJson.FileName))
 	// 校验文件的hashkey
 	code, err := util.CalculateFileHash(filepath.Join(output, downJson.FileName))
 	if err != nil {
@@ -116,6 +118,7 @@ func checkParts(dwPath, output string) error {
 		return err
 	}
 	if code != downJson.HashKey {
+		log.Printf("文件校验失败: 计算结果: %s, 期待结果: %s\n", code, downJson.HashKey)
 		return errors.New("hash key not supported")
 	}
 	// 删除文件夹中的down.json和part文件
