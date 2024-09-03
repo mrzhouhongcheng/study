@@ -17,13 +17,12 @@ import (
 
 func main() {
 
-	downJsonPath := flag.String("d", "", "指定数据down.json文件地址")
-	checkJsonPath := flag.String("c", "", "指定检查的down.json文件地址")
-	url := flag.String("h", "", "指定文件下载的url地址")
+	checkJsonPath := flag.String("f", "", "指定down.json文件，下载数据")
+	url := flag.String("d", "", "指定文件下载的url地址")
 	output := flag.String("o", "", "指定文件的下载路径")
 	flag.Parse()
 
-	if *downJsonPath == "" && *checkJsonPath == "" && *url == "" {
+	if *checkJsonPath == "" && *url == "" {
 		fmt.Println("Usage: down [option(-d|-c|-h)] <data.json>")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -32,26 +31,6 @@ func main() {
 		err := downJSON(*url, *output)
 		if err != nil {
 			fmt.Printf("%v\n", err)
-			os.Exit(1)
-		}
-		// 下载他的数据文件
-		err = downPart(*output, *output)
-		if err != nil {
-			fmt.Printf("downPart failed: %v\n", err)
-			os.Exit(1)
-		}
-		err = checkParts(*output)
-		if err != nil {
-			fmt.Printf("checkParts failed: %v\n", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-
-	if *downJsonPath != "" {
-		err := downPart(*output, *output)
-		if err != nil {
-			fmt.Printf("downPart failed: %v\n", err)
 			os.Exit(1)
 		}
 		err = checkParts(*output)
@@ -79,7 +58,7 @@ func downJSON(url, output string) error {
 
 	params_str, err := json.Marshal(params)
 	if err != nil {
-		fmt.Errorf("Unable to marshal params: %v", err)
+		fmt.Printf("Unable to marshal params: %v \n", err)
 		return err
 	}
 	res, err := http.Post("http://localhost:8889/down", "application/json", strings.NewReader(string(params_str)))
@@ -94,18 +73,6 @@ func downJSON(url, output string) error {
 		return err
 	}
 	return util.WriteFile(filepath.Join(output, "down.json"), dw)
-}
-
-func downPart(dwPath, output string) error {
-	downJson, err := fileserver.GetDownjsonByPath(dwPath)
-	if err != nil {
-		return err
-	}
-	for _, path := range downJson.FileList {
-		url := fmt.Sprintf("http://localhost:8888/%s", path)
-		getFileByUrl(url, filepath.Join(output, filepath.Base(path)))
-	}
-	return nil
 }
 
 // dwPath : down.json 文件夹的路径地址
