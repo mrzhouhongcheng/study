@@ -117,17 +117,17 @@ func SplitFilder(path string) (string, error) {
 // 如果文件夹路径下没有down.json文件, 则报错
 // 如果没有找到fileList中相对应的分片文件, 则报错
 // 如果hashKey不匹配, 则报错
-func Merge(path string) error {
+func Merge(dwPath, output string) error {
 	// 判断传入的路径是否是一个文件夹
-	if path != "" && !util.IsDirNotError(path) {
+	if dwPath != "" && !util.IsDirNotError(dwPath) {
 		return errors.New("path is not a directory")
 	}
 	// 读取down.json
-	downJson, err := GetDownjsonByPath(path)
+	downJson, err := GetDownjsonByPath(dwPath)
 	if err != nil {
 		return err
 	}
-	filePath := filepath.Join(path, downJson.FileName)
+	filePath := filepath.Join(output, downJson.FileName)
 	if util.FileExists(filePath) {
 		os.Remove(filePath)
 	}
@@ -139,7 +139,7 @@ func Merge(path string) error {
 
 	for _, val := range downJson.FileList {
 		partName := filepath.Base(val)
-		partFile, err := os.Open(filepath.Join(path, partName))
+		partFile, err := os.Open(filepath.Join(output, partName))
 		if err != nil {
 			return err
 		}

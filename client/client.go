@@ -29,11 +29,12 @@ func main() {
 	}
 	if *url != "" {
 		err := downJSON(*url, *output)
+		dwPath := *output
 		if err != nil {
 			fmt.Printf("%v\n", err)
 			os.Exit(1)
 		}
-		err = checkParts(*output)
+		err = checkParts(dwPath, *output)
 		if err != nil {
 			fmt.Printf("checkParts failed: %v\n", err)
 			os.Exit(1)
@@ -42,14 +43,13 @@ func main() {
 	}
 
 	if *checkJsonPath != "" {
-		err := checkParts(*output)
+		err := checkParts(*checkJsonPath, *output)
 		if err != nil {
 			fmt.Printf("checkParts failed: %v\n", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
 	}
-
 }
 
 func downJSON(url, output string) error {
@@ -76,7 +76,7 @@ func downJSON(url, output string) error {
 }
 
 // dwPath : down.json 文件夹的路径地址
-func checkParts(dwPath string) error {
+func checkParts(dwPath, output string) error {
 	downJson, err := fileserver.GetDownjsonByPath(dwPath)
 	if err != nil {
 		fmt.Printf("Get down.json failed: %v\n", err)
@@ -84,7 +84,7 @@ func checkParts(dwPath string) error {
 	}
 	for _, path := range downJson.FileList {
 		// 获取文件在本地的路径
-		part_path := filepath.Join(dwPath, filepath.Base(path))
+		part_path := filepath.Join(output, filepath.Base(path))
 		if !util.FileExists(part_path) {
 			url := fmt.Sprintf("http://localhost:8888/%s", path)
 			err = getFileByUrl(url, part_path)
@@ -95,13 +95,13 @@ func checkParts(dwPath string) error {
 		}
 	}
 	// 合并文件
-	err = fileserver.Merge(dwPath)
+	err = fileserver.Merge(dwPath, output)
 	if err != nil {
 		fmt.Printf("Merge file failed: %v\n", err)
 		return err
 	}
 	// 校验文件的hashkey
-	code, err := util.CalculateFileHash(filepath.Join(dwPath, downJson.FileName))
+	code, err := util.CalculateFileHash(filepath.Join(output, downJson.FileName))
 	if err != nil {
 		fmt.Println("Error calculating file hash from file: ", err)
 		return err
@@ -109,6 +109,40 @@ func checkParts(dwPath string) error {
 	if code != downJson.HashKey {
 		return errors.New("hash key not supported")
 	}
+	// 删除文件夹中的down.json和part文件
+	removeDownInfo(dwPath, output)
+	return nil
+}
+
+func removeDownInfo(dwpath, output string) error {
+	downJson, err := fileserver.GetDownjsonByPath(dwpath)
+	if err != nil {
+		fmt.Println("get down json failed: ", err)
+		return err
+	}
+	// 删除json文件
+	os.Remove(filepath.Join(dwpath, "down.json"))
+	for _, path := range downJson.FileList {
+		os.Remove(filepath.Join(output, filepath.Base(path)))
+	}
+
+	return nil
+}
+
+// removeServerTempFile removes the temporary
+func removeServerTempFile(dwPath string) error {
+	// 获取downJons的信息
+	dj, _ := fileserver.GetDownjsonByPath(dwPath)
+	partPath := dj.FileList[0]
+	params := make(map[string]string)
+	params["removePath"] = filepath.Dir(partPath)
+
+	params_str, err := json.Marshal(params)
+	if err != nil {
+		fmt.Printf("Unable to marshal params: %v \n", err)
+		return err
+	}
+	http.Post("http://localhost:8889/remove", "application/json", strings.NewReader(string(params_str)))
 	return nil
 }
 

@@ -31,6 +31,27 @@ func startFTP() {
 	}()
 }
 
+func removeTempHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+	var params = make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&params)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	removePath, ok := params["removePath"]
+	if !ok {
+		http.Error(w, "Missing removePath parameter", http.StatusBadRequest)
+		return
+	}
+	os.RemoveAll(removePath)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("{\"code\":1,\"data\": \"success\"}"))
+}
+
 func downHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
@@ -77,6 +98,7 @@ func main() {
 	startFTP()
 
 	http.HandleFunc("/down", downHandler)
+	http.HandleFunc("/remove", removeTempHandler)
 
 	log.Fatal(http.ListenAndServe(":8889", nil))
 
