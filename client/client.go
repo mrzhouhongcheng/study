@@ -107,11 +107,11 @@ func checkParts(dwPath, output string) error {
 		return errors.New("hash key not supported")
 	}
 	// 删除文件夹中的down.json和part文件
-	removeDownInfo(dwPath, output)
+	removeDownInfo(dwPath, output, removeServerTempFile)
 	return nil
 }
 
-func removeDownInfo(dwpath, output string) error {
+func removeDownInfo(dwpath, output string, removeServerTempFileFunc func(string) error) error {
 	downJson, err := fileserver.GetDownjsonByPath(dwpath)
 	if err != nil {
 		fmt.Println("get down json failed: ", err)
@@ -120,7 +120,7 @@ func removeDownInfo(dwpath, output string) error {
 	for _, path := range downJson.FileList {
 		os.Remove(filepath.Join(output, filepath.Base(path)))
 	}
-	removeServerTempFile(dwpath)
+	removeServerTempFileFunc(dwpath)
 	// 删除json文件
 	os.Remove(dwpath)
 	return nil
@@ -148,9 +148,5 @@ func getFileByUrl(url, output string) error {
 		return err
 	}
 	defer res.Body.Close()
-	content, err := io.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-	return util.WriteFile(output, content)
+	return util.WriteFileByReader(output, res.Body)
 }

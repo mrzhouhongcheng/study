@@ -20,7 +20,6 @@ import (
 // 文件服务器监听的地址是8888
 // 现在服务器监听的地址是8889
 // 传入的参数就是文件服务器的下载地址
-
 func startFTP() {
 	go func() {
 		fileServer := http.FileServer(http.Dir("./"))
