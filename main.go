@@ -86,7 +86,7 @@ func downHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 读取一个文件
-	data, err := os.ReadFile(filepath.Join(filepath.Dir(filePath), uuid, "down.json"))
+	data, err := os.ReadFile(filepath.Join(os.TempDir(), uuid, "down.json"))
 	if err != nil {
 		http.Error(w, "read down json file is error", http.StatusInternalServerError)
 		return
@@ -94,11 +94,26 @@ func downHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(data))
 }
 
+func downpartHandler(w http.ResponseWriter, r *http.Request) {
+	part := r.URL.Query().Get("part")
+	if !util.FileExists(part) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	FileName := filepath.Base(part)
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", FileName))
+	w.Header().Set("Content-Type", "application/octet-stream")
+
+	http.ServeFile(w, r, part)
+}
+
 func main() {
 	startFTP()
 
 	http.HandleFunc("/down", downHandler)
 	http.HandleFunc("/remove", removeTempHandler)
+	http.HandleFunc("/downpart", downpartHandler)
 
 	log.Fatal(http.ListenAndServe(":8889", nil))
 

@@ -16,12 +16,10 @@ import (
 )
 
 func main() {
-
 	checkJsonPath := flag.String("f", "", "指定down.json文件,下载数据")
 	url := flag.String("d", "", "指定文件下载的url地址")
 	output := flag.String("o", "", "指定文件的下载路径")
 	flag.Parse()
-
 	if *checkJsonPath == "" && *url == "" {
 		fmt.Println("Usage: down [option(-d|-c|-h)] <data.json>")
 		flag.PrintDefaults()
@@ -41,7 +39,6 @@ func main() {
 		}
 		os.Exit(0)
 	}
-
 	if *checkJsonPath != "" {
 		err := checkParts(filepath.Join(*checkJsonPath, "down.json"), *output)
 		if err != nil {
@@ -86,7 +83,7 @@ func checkParts(dwPath, output string) error {
 		// 获取文件在本地的路径
 		part_path := filepath.Join(output, filepath.Base(path))
 		if !util.FileExists(part_path) {
-			url := fmt.Sprintf("http://localhost:8888/%s", path)
+			url := fmt.Sprintf("http://localhost:8889/downpart?part=%s", path)
 			err = getFileByUrl(url, part_path)
 			if err != nil {
 				fmt.Println("Error getting file from URL: ", err)
@@ -120,12 +117,12 @@ func removeDownInfo(dwpath, output string) error {
 		fmt.Println("get down json failed: ", err)
 		return err
 	}
-	// 删除json文件
-	os.Remove(dwpath)
 	for _, path := range downJson.FileList {
 		os.Remove(filepath.Join(output, filepath.Base(path)))
 	}
-
+	removeServerTempFile(dwpath)
+	// 删除json文件
+	os.Remove(dwpath)
 	return nil
 }
 
@@ -133,9 +130,8 @@ func removeDownInfo(dwpath, output string) error {
 func removeServerTempFile(dwPath string) error {
 	// 获取downJons的信息
 	dj, _ := fileserver.GetDownjsonByPath(dwPath)
-	partPath := dj.FileList[0]
 	params := make(map[string]string)
-	params["removePath"] = filepath.Dir(partPath)
+	params["removePath"] = dj.FolderPath
 
 	params_str, err := json.Marshal(params)
 	if err != nil {

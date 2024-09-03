@@ -65,15 +65,17 @@ func Split(path string) ([]string, error) {
 type DownJson struct {
 	FileName   string   `json:"fileName"`
 	FolderName string   `json:"folderName"`
+	FolderPath string   `json:"folderPath"`
 	HashKey    string   `json:"hashKey"`
 	FileList   []string `json:"fileList"`
 }
 
-func NewDownJons(uuid, hashKey, fileName string, fileList []string) *DownJson {
+func NewDownJons(uuid, hashKey, fileName, folderPath string, fileList []string) *DownJson {
 	return &DownJson{
 		FileName:   fileName,
 		FolderName: uuid,
 		HashKey:    hashKey,
+		FolderPath: folderPath,
 		FileList:   fileList,
 	}
 }
@@ -88,9 +90,8 @@ func SplitFilder(path string) (string, error) {
 		log.Println("path is not a file")
 		return "", errors.New("path is not a file, MergeFilder failed")
 	}
-	dirPath := filepath.Dir(path)
 	uuid := util.GenerageUUID()
-	targetPath := filepath.Join(dirPath, uuid, filepath.Base(path))
+	targetPath := filepath.Join(os.TempDir(), uuid, filepath.Base(path))
 	util.CopyFile(path, targetPath)
 
 	// 计算文件的hash值
@@ -99,7 +100,7 @@ func SplitFilder(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	downjson := NewDownJons(uuid, hashKey, filepath.Base(targetPath), fileList)
+	downjson := NewDownJons(uuid, hashKey, filepath.Base(targetPath), filepath.Dir(targetPath), fileList)
 	data, err := json.Marshal(downjson)
 	if err != nil {
 		return "", err

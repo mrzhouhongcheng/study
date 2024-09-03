@@ -15,3 +15,6 @@ Content-Type: application/json
     "filePath": "http://localhost:8888/test.http"
 }
 
+
+### test downpart
+GET http://localhost:8889/downpart?part=/tmp/helloworld
