@@ -119,7 +119,7 @@ func SplitFilder(path string) (string, error) {
 // 如果hashKey不匹配, 则报错
 func Merge(path string) error {
 	// 判断传入的路径是否是一个文件夹
-	if !util.IsDirNotError(path) {
+	if path != "" && !util.IsDirNotError(path) {
 		return errors.New("path is not a directory")
 	}
 	// 读取down.json

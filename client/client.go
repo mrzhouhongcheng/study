@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,7 +31,7 @@ func main() {
 	if *url != "" {
 		err := downJSON(*url, *output)
 		if err != nil {
-			fmt.Errorf("%v", err)
+			fmt.Printf("%v\n", err)
 			os.Exit(1)
 		}
 		// 下载他的数据文件
@@ -39,15 +40,35 @@ func main() {
 			fmt.Printf("downPart failed: %v\n", err)
 			os.Exit(1)
 		}
+		err = checkParts(*output)
+		if err != nil {
+			fmt.Printf("checkParts failed: %v\n", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
 	if *downJsonPath != "" {
-		fmt.Println("-d is ", *downJsonPath)
+		err := downPart(*output, *output)
+		if err != nil {
+			fmt.Printf("downPart failed: %v\n", err)
+			os.Exit(1)
+		}
+		err = checkParts(*output)
+		if err != nil {
+			fmt.Printf("checkParts failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 
 	if *checkJsonPath != "" {
-		fmt.Println("-c is ", *checkJsonPath)
+		err := checkParts(*output)
+		if err != nil {
+			fmt.Printf("checkParts failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 
 }
@@ -82,16 +103,57 @@ func downPart(dwPath, output string) error {
 	}
 	for _, path := range downJson.FileList {
 		url := fmt.Sprintf("http://localhost:8888/%s", path)
-		res, err := http.Get(url)
-		if err != nil {
-			return err
-		}
-		defer res.Body.Close()
-		content, err := io.ReadAll(res.Body)
-		if err != nil {
-			return err
-		}
-		util.WriteFile(filepath.Join(output, filepath.Base(path)), content)
+		getFileByUrl(url, filepath.Join(output, filepath.Base(path)))
 	}
 	return nil
+}
+
+// dwPath : down.json 文件夹的路径地址
+func checkParts(dwPath string) error {
+	downJson, err := fileserver.GetDownjsonByPath(dwPath)
+	if err != nil {
+		fmt.Printf("Get down.json failed: %v\n", err)
+		return err
+	}
+	for _, path := range downJson.FileList {
+		// 获取文件在本地的路径
+		part_path := filepath.Join(dwPath, filepath.Base(path))
+		if !util.FileExists(part_path) {
+			url := fmt.Sprintf("http://localhost:8888/%s", path)
+			err = getFileByUrl(url, part_path)
+			if err != nil {
+				fmt.Println("Error getting file from URL: ", err)
+				return err
+			}
+		}
+	}
+	// 合并文件
+	err = fileserver.Merge(dwPath)
+	if err != nil {
+		fmt.Printf("Merge file failed: %v\n", err)
+		return err
+	}
+	// 校验文件的hashkey
+	code, err := util.CalculateFileHash(filepath.Join(dwPath, downJson.FileName))
+	if err != nil {
+		fmt.Println("Error calculating file hash from file: ", err)
+		return err
+	}
+	if code != downJson.HashKey {
+		return errors.New("hash key not supported")
+	}
+	return nil
+}
+
+func getFileByUrl(url, output string) error {
+	res, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	content, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	return util.WriteFile(output, content)
 }
