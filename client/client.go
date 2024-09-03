@@ -41,7 +41,7 @@ func main() {
 		os.Exit(0)
 	}
 	if *checkJsonPath != "" {
-		err := checkParts(filepath.Join(*checkJsonPath, "down.json"), *output)
+		err := checkParts(*checkJsonPath, *output)
 		if err != nil {
 			fmt.Printf("checkParts failed: %v\n", err)
 			os.Exit(1)
@@ -97,7 +97,7 @@ func checkParts(dwPath, output string) error {
 					fmt.Println("Error getting file from URL: ", err)
 					return
 				}
-				fmt.Printf("remove file: %s \t %s\n", part_path+".tmp", part_path)
+				fmt.Printf("download file: %s \t %s\n", part_path+".tmp", part_path)
 				os.Rename(part_path+".tmp", part_path)
 			}
 		}(output, path)

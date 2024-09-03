@@ -9,11 +9,26 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	"com.zhouhc.study/src/util"
 )
 
-func Split(path string) ([]string, error) {
+// path 源文件地址
+// output 文件的输出目录
+// Split is a function that splits a large file into smaller parts.//+
+// It takes a single parameter://+
+// - path: A string representing the path to the file to be split.//+
+// //+
+// The function returns two values://+
+// - []string: A slice of strings representing the paths to the created part files.//+
+// - error: An error value that is nil if the function completes successfully, or an error if an error occurs.//+
+// //+
+// The function reads the file specified by the given path and splits it into smaller parts.//+
+// Each part file is named as the original file name followed by ".part" and a sequential index number.//+
+// The part files are created in the same directory as the original file.//+
+// The function uses a buffered reader to read the file and a wait group to ensure all part files are written before returning.//+
+func Split(path, output string) ([]string, error) {
 	// 如果路径不是一个文件, 那么就返回err
 	isFile, err := util.IsFile(path)
 	if err != nil {
@@ -37,6 +52,8 @@ func Split(path string) ([]string, error) {
 	defer file.Close()
 	index := 1
 	var res []string = make([]string, 0)
+	syncChan := make(chan string, 20)
+	var wg sync.WaitGroup
 	for {
 		n, err := file.Read(buf)
 		if err != nil {
@@ -50,15 +67,24 @@ func Split(path string) ([]string, error) {
 			break
 		}
 		newFilePath := file_name + ".part" + strconv.Itoa(index)
-		newFilePath = filepath.Join(filepath.Dir(path), newFilePath)
-		err = os.WriteFile(newFilePath, buf[:n], os.ModePerm)
-		if err != nil {
-			log.Println("write new file failed, ", err)
-			return nil, err
-		}
+		newFilePath = filepath.Join(output, newFilePath)
+		syncChan <- newFilePath
+		wg.Add(1)
+		go func(data []byte, filePath string) {
+			log.Printf("split file : %s \n", filePath)
+			defer func() {
+				wg.Done()
+				<-syncChan
+			}()
+			err := os.WriteFile(filePath, data, os.ModePerm)
+			if err != nil {
+				log.Println("write new file failed, ", err)
+			}
+		}(buf[:n], newFilePath)
 		index += 1
 		res = append(res, newFilePath)
 	}
+	wg.Wait()
 	return res, nil
 }
 
@@ -92,11 +118,13 @@ func SplitFilder(path string) (string, error) {
 	}
 	uuid := util.GenerageUUID()
 	targetPath := filepath.Join(os.TempDir(), uuid, filepath.Base(path))
-	util.CopyFile(path, targetPath)
+	os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
 
 	// 计算文件的hash值
-	hashKey, _ := util.CalculateFileHash(targetPath)
-	fileList, err := Split(targetPath)
+	log.Printf("calculating file hash...\n")
+	hashKey, _ := util.CalculateFileHash(path)
+	log.Printf("current file hash key is %s \n", hashKey)
+	fileList, err := Split(path, filepath.Dir(targetPath))
 	if err != nil {
 		return "", err
 	}
@@ -139,6 +167,7 @@ func Merge(dwPath, output string) error {
 	defer file.Close()
 
 	for _, val := range downJson.FileList {
+		log.Printf("merge file %v\n", val)
 		partName := filepath.Base(val)
 		partFile, err := os.Open(filepath.Join(output, partName))
 		if err != nil {

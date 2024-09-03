@@ -7,7 +7,7 @@ import (
 )
 
 func TestSplit(t *testing.T) {
-	res, err := Split("../../test/test.js")
+	res, err := Split("../../test/test.js", "../../test/")
 	if err != nil {
 		t.Error(err)
 	}
@@ -17,7 +17,7 @@ func TestSplit(t *testing.T) {
 func TestSplit2(t *testing.T) {
 	t.Skip("skipping Test TestSplit2 for now. because this jdb-8u361-windows-x64.exe file is not found")
 
-	res, err := Split("../../test/jdk-8u361-windows-x64.exe")
+	res, err := Split("../../test/jdk-8u361-windows-x64.exe", "../../test/")
 	if err != nil {
 		t.Error(err)
 	}
