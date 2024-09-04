@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,7 +93,9 @@ func checkParts(dwPath, output string) error {
 			// 获取文件在本地的路径
 			part_path := filepath.Join(outDir, filepath.Base(_path))
 			if !util.FileExists(part_path) {
-				url := fmt.Sprintf("http://localhost:8889/downpart?part=%s", _path)
+				params := url.Values{}
+				params.Add("part", _path)
+				url := fmt.Sprintf("http://localhost:8889/downpart?%s", params.Encode())
 				err = getFileByUrl(url, part_path+".tmp")
 				if err != nil {
 					fmt.Println("Error getting file from URL: ", err)
