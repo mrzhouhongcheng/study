@@ -18,11 +18,38 @@ import (
 	"com.zhouhc.study/src/util"
 )
 
+var host string
+
+func readHost() {
+	configPath := filepath.Join(os.TempDir(), "pclient", "config")
+
+	if util.FileExists(configPath) {
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return
+		}
+		host = string(data)
+	}
+}
+
 func main() {
+	readHost()
+
 	checkJsonPath := flag.String("f", "", "指定down.json文件,下载数据")
 	url := flag.String("d", "", "指定文件下载的url地址")
 	output := flag.String("o", "", "指定文件的下载路径")
+	downHost := flag.String("h", "", "指定服务器的ip地址")
 	flag.Parse()
+
+	if *downHost == "" && host == "" {
+		fmt.Println("未指定服务器地址，启动失败")
+		flag.PrintDefaults()
+		os.Exit(1)
+	} else if *downHost != "" {
+		util.WriteFile(filepath.Join(os.TempDir(), "pclient", "config"), []byte(*downHost))
+		host = *downHost
+	}
+
 	if *checkJsonPath == "" && *url == "" {
 		fmt.Println("Usage: down [option(-d|-c|-h)] <data.json>")
 		flag.PrintDefaults()
@@ -61,7 +88,9 @@ func downJSON(url, output string) error {
 		fmt.Printf("Unable to marshal params: %v \n", err)
 		return err
 	}
-	res, err := http.Post("http://localhost:8889/down", "application/json", strings.NewReader(string(params_str)))
+	res, err := http.Post(
+		fmt.Sprintf("http://%s:8889/down", host),
+		"application/json", strings.NewReader(string(params_str)))
 	if err != nil {
 		fmt.Printf("Post request failed: %s\n", err)
 		return err
@@ -95,7 +124,7 @@ func checkParts(dwPath, output string) error {
 			if !util.FileExists(part_path) {
 				params := url.Values{}
 				params.Add("part", _path)
-				url := fmt.Sprintf("http://localhost:8889/downpart?%s", params.Encode())
+				url := fmt.Sprintf("http://%s:8889/downpart?%s", host, params.Encode())
 				err = getFileByUrl(url, part_path+".tmp")
 				if err != nil {
 					fmt.Println("Error getting file from URL: ", err)
@@ -158,7 +187,9 @@ func removeServerTempFile(dwPath string) error {
 		fmt.Printf("Unable to marshal params: %v \n", err)
 		return err
 	}
-	http.Post("http://localhost:8889/remove", "application/json", strings.NewReader(string(params_str)))
+	http.Post(
+		fmt.Sprintf("http://%s:8889/remove", host),
+		"application/json", strings.NewReader(string(params_str)))
 	return nil
 }
 
