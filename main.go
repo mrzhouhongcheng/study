@@ -1,72 +1,73 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
+	"io"
 	"log"
-	"os"
+	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/text/date"
 )
 
-const url = "mongodb://10.88.19.100:27017,10.88.19.101:27017,10.88.19.102:27017/fish?replicaSet=rs01"
-const database_name = "zhouhc_test"
+type ProxyServer struct {
+	Host       string    `json:"host"`
+	Port       int       `json:"port"`
+	LastAction time.Time `json:"lastAction"`
+}
+
+func proxyHandler(w http.ResponseWriter, r *http.Request) {
+	targetURL := "http://10.88.19.91"
+	parsedURL, err := url.Parse(targetURL)
+	if err != nil {
+		http.Error(w, "Invalid target url", http.StatusInternalServerError)
+		return
+	}
+	var url string
+	if strings.HasPrefix(r.URL.Path, "/api") {
+		url = parsedURL.String() + r.URL.Path
+	} else {
+		url = parsedURL.String() + "/api" + r.URL.Path
+	}
+	log.Println("proxy url : ", url)
+	proxyReq, err := http.NewRequest(r.Method, url, r.Body)
+	if err != nil {
+		http.Error(w, "Error creating proxy request", http.StatusInternalServerError)
+		return
+	}
+	proxyReq.Header = r.Header
+
+	client := &http.Client{}
+
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		http.Error(w, "Failed to connect to target serve", http.StatusInternalServerError)
+		return
+	}
+
+	defer resp.Body.Close()
+
+	for key, Values := range resp.Header {
+		for _, val := range Values {
+			w.Header().Add(key, val)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		http.Error(w, "Error copying response body", http.StatusInternalServerError)
+		return
+	}
+}
 
 func main() {
+	http.HandleFunc("/", proxyHandler)
 
-	clientOptions := options.Client().ApplyURI(url)
-
-	client, err := mongo.Connect(context.TODO(), clientOptions)
-
+	log.Println("Proxy server is running or port 9999....")
+	err := http.ListenAndServe(":9999", nil)
 	if err != nil {
-		panic(err)
+		log.Fatal("ListenAndServe: ", err)
 	}
-	err = client.Ping(context.TODO(), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Successfully connected to MongoDB!")
-
-	args := os.Args
-	fileName := args[1]
-	tableName := strings.Replace(fileName, ".js", "", 1)
-	fmt.Println("table name is :", tableName)
-	var jsonStr = load(fileName)
-	var jsonData []string
-
-	json.Unmarshal([]byte(jsonStr), &jsonData)
-
-	for _, item := range jsonData {
-		var insertData bson.M
-		bson.UnmarshalExtJSON([]byte(item), true, &insertData)
-		fmt.Println(insertData)
-		insertToDB(insertData, tableName, client)
-	}
-}
-
-func insertToDB(data bson.M, tableName string, client *mongo.Client) {
-	collection := client.Database(database_name).Collection(tableName)
-
-	count, err := collection.CountDocuments(context.TODO(), bson.M{"_id": data["_id"]})
-	if count > 0 {
-		collection.DeleteOne(context.TODO(), bson.M{"_id": data["_id"]})
-		fmt.Println("删除一条数据")
-	}
-	collection.InsertOne(context.TODO(), data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Inserted a single document: ", data)
-}
-
-func load(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Println("文件读取失败: ", path)
-	}
-	return string(data)
 }
