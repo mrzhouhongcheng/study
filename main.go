@@ -78,6 +78,8 @@ func activeHandler(w http.ResponseWriter, r *http.Request) {
 	server := NewProxyServerByModel(model)
 	key := server.getKey()
 	if proxyServer, ok:= ProxyServerMap[key]; ok {
+		proxyServer.mu.Lock()
+		defer proxyServer.mu.Unlock()
 		proxyServer.LastAction = time.Now()
 		w.WriteHeader(http.StatusOK)
 	} else {
