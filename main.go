@@ -6,16 +6,20 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
-
-	"golang.org/x/text/date"
 )
 
 type ProxyServer struct {
 	Host       string    `json:"host"`
 	Port       int       `json:"port"`
 	LastAction time.Time `json:"lastAction"`
+	IsAction   bool      `json:"isAction"`
+
+	mu sync.Mutex
 }
+
+var ProxyServerMap map[string]ProxyServer 
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	targetURL := "http://10.88.19.91"
