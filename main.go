@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +21,69 @@ type ProxyServer struct {
 	mu sync.Mutex
 }
 
-var ProxyServerMap map[string]ProxyServer 
+func NewProxyServerByModel(model ProxyServerModel) *ProxyServer {
+	return &ProxyServer{
+		Host: model.Host,
+		Port: model.Port,
+	}
+}
+
+type ProxyServerModel struct {
+	Host        string    `json:"host"`
+	Port        int       `json:"port"`
+	RequestTime time.Time `json:"requestTime"`
+}
+
+var ProxyServerMap map[string]*ProxyServer
+
+func (p *ProxyServer) getKey() string {
+	return p.Host + ":" + strconv.Itoa(p.Port)
+}
+
+// 注册
+func registryHandler(w http.ResponseWriter, r *http.Request) {
+	var model ProxyServerModel
+	err := json.NewDecoder(r.Body).Decode(&model)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	server := NewProxyServerByModel(model)
+	key := server.getKey()
+	if _, ok := ProxyServerMap[key]; ok {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	server.IsAction = false
+	ProxyServerMap[key] = server
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// 激活
+func activeHandler(w http.ResponseWriter, r *http.Request) {
+	var model ProxyServerModel
+	err := json.NewDecoder(r.Body).Decode(&model)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	timeout := model.RequestTime.Add(20 * time.Second)
+	if time.Now().After(timeout) {
+		http.Error(w, "Invalid request time", http.StatusInternalServerError)
+		return
+	}
+	server := NewProxyServerByModel(model)
+	key := server.getKey()
+	if proxyServer, ok:= ProxyServerMap[key]; ok {
+		proxyServer.LastAction = time.Now()
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Error(w, "proxy server not registry", http.StatusInternalServerError)
+	}
+}
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	targetURL := "http://10.88.19.91"
@@ -67,7 +131,10 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	ProxyServerMap = make(map[string]*ProxyServer)
 	http.HandleFunc("/", proxyHandler)
+	http.HandleFunc("/active", activeHandler)
+	http.HandleFunc("/registry", registryHandler)
 
 	log.Println("Proxy server is running or port 9999....")
 	err := http.ListenAndServe(":9999", nil)
