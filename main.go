@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -77,7 +79,7 @@ func activeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	server := NewProxyServerByModel(model)
 	key := server.getKey()
-	if proxyServer, ok:= ProxyServerMap[key]; ok {
+	if proxyServer, ok := ProxyServerMap[key]; ok {
 		proxyServer.mu.Lock()
 		defer proxyServer.mu.Unlock()
 		proxyServer.LastAction = time.Now()
@@ -85,6 +87,27 @@ func activeHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "proxy server not registry", http.StatusInternalServerError)
 	}
+}
+
+// map中随机选择一个地址
+func geturlByProxyServerMap() (string, error) {
+	if len(ProxyServerMap) == 0 {
+		return "", errors.New("proxy server map is empty")
+	}
+	keys := make([]string, 0)
+	for key, proxy := range ProxyServerMap {
+		proxy.mu.Lock()
+		defer proxy.mu.Unlock()
+		if proxy.IsAction {
+			keys = append(keys, key)
+		}
+	}
+	if len(keys) == 0 {
+		return "", errors.New("no active proxy server")
+	}
+	randomIndex := rand.Intn(len(keys))
+	proxyServer := ProxyServerMap[keys[randomIndex]]
+	return fmt.Sprintf("http://%s:%d", proxyServer.Host, proxyServer.Port), nil
 }
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,11 +118,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var url string
-	if strings.HasPrefix(r.URL.Path, "/api") {
-		url = parsedURL.String() + r.URL.Path
-	} else {
-		url = parsedURL.String() + "/api" + r.URL.Path
-	}
+	url = parsedURL.String() + r.URL.Path
 	log.Println("proxy url : ", url)
 	proxyReq, err := http.NewRequest(r.Method, url, r.Body)
 	if err != nil {
@@ -133,6 +152,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
 	ProxyServerMap = make(map[string]*ProxyServer)
 	http.HandleFunc("/", proxyHandler)
 	http.HandleFunc("/active", activeHandler)
