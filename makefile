@@ -1,7 +1,7 @@
 gotest:
 	go test ./...
 
-run:
+runServer:
 	go run main.go
 
 build:
