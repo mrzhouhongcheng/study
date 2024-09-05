@@ -3,3 +3,6 @@
 /jdk-8u361-windows-x64*
 /*/ubuntu-*
 /ubuntu-*
+/data_recover*
+/client/client
+/client/client.exe
