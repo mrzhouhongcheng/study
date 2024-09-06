@@ -9,9 +9,11 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"com.zhouhc.study/service"
+	"github.com/spf13/viper"
 )
 
 var ProxyServerMap map[string]*service.ProxyServer
@@ -102,8 +104,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid target url", http.StatusInternalServerError)
 		return
 	}
-	var url string
-	url = parsedURL.String() + r.URL.Path
+	url := parsedURL.String() + r.URL.Path
 	log.Println("proxy url : ", url)
 	proxyReq, err := http.NewRequest(r.Method, url, r.Body)
 	if err != nil {
@@ -137,14 +138,23 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	viper.SetConfigName("application.yml")
+	viper.SetConfigType("yml")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file: %v", err)
+	}
+
+	port := viper.GetInt("port")
+	log.Println("gproxy port listen: ", port)
 
 	ProxyServerMap = make(map[string]*service.ProxyServer)
 	http.HandleFunc("/", proxyHandler)
 	http.HandleFunc("/gproxy/active", activeHandler)
 	http.HandleFunc("/gproxy/registry", registryHandler)
 
-	log.Println("Proxy server is running or port 9999....")
-	err := http.ListenAndServe(":9999", nil)
+	log.Println("Proxy server is running or port " + strconv.Itoa(port) + "....")
+	err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", port), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

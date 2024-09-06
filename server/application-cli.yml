@@ -1,0 +1,5 @@
+gproxy:
+  host: 127.0.0.1
+  port: 9011
+  server: http://localhost:9999/
+

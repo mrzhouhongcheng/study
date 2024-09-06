@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"com.zhouhc.study/client"
+	"github.com/spf13/viper"
 )
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
@@ -16,11 +18,19 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	viper.SetConfigName("application-cli.yml")
+	viper.SetConfigType("yml")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file: %v", err)
+	}
+
 	client.InitializeGProxy()
 
 	http.HandleFunc("/hello", helloHandler)
-	err := http.ListenAndServe(":9912", nil)
-	if err!= nil {
-        log.Fatal("ListenAndServe: ", err)
-    }
+	port := viper.GetInt("gproxy.port")
+	err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", port), nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
 }

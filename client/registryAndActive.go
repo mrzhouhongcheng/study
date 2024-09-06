@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"com.zhouhc.study/service"
+	"github.com/spf13/viper"
 )
 
 func Registry(host string, port int) error {
@@ -26,7 +29,9 @@ func Registry(host string, port int) error {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	resp, err := client.Post("http://localhost:9999/gproxy/registry", "Content-type: application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Post(
+		fmt.Sprintf("%sgproxy/registry", getServerURL()),
+		"Content-type: application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Println("http post failed", err)
 		return err
@@ -42,8 +47,9 @@ func Registry(host string, port int) error {
 
 func Active(host string, port int) error {
 	params := service.ProxyServerModel{
-		Host:        host,
-		Port:        port,
+		Host: host,
+		Port: port,
+
 		RequestTime: time.Now(),
 	}
 	jsonData, err := json.Marshal(params)
@@ -54,7 +60,9 @@ func Active(host string, port int) error {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	resp, err := client.Post("http://localhost:9999/gproxy/active", "Content-type: application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Post(
+		fmt.Sprintf("%sgproxy/active", getServerURL()),
+		"Content-type: application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Println("http post failed", err)
 		return err
@@ -68,8 +76,22 @@ func Active(host string, port int) error {
 	return nil
 }
 
+func getServerURL() string {
+	url := viper.GetString("gproxy.server")
+	if url == "" {
+		log.Fatal("gproxy.server is required")
+		panic(0)
+	}
+	if strings.HasSuffix(url, "/") {
+		return url
+	}
+	return url + "/"
+}
+
 func InitializeGProxy() {
-	err := Registry("localhost", 9912)
+	port := viper.GetInt("gproxy.port")
+	host := viper.GetString("gproxy.host")
+	err := Registry(host, port)
 	if err != nil {
 		log.Println("registry failed", err)
 		panic(0)
@@ -79,7 +101,7 @@ func InitializeGProxy() {
 		ticker := time.NewTicker(20 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			go Active("localhost", 9912)
+			go Active(host, port)
 		}
 	}()
 }
