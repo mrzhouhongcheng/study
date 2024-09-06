@@ -40,6 +40,29 @@ func registryHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func activeCheck() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if len(ProxyServerMap) == 0 {
+				continue
+			}
+			for _, val := range ProxyServerMap {
+				if !val.IsAction {
+					continue
+				}
+				timeout := val.LastAction.Add(3 * 20 * time.Second)
+				if time.Now().After(timeout) {
+					val.Mu.Lock()
+					val.IsAction = false
+					val.Mu.Unlock()
+				}
+			}
+		}
+	}()
+}
+
 // 激活
 func activeHandler(w http.ResponseWriter, r *http.Request) {
 	var model service.ProxyServerModel
@@ -149,6 +172,8 @@ func main() {
 	log.Println("gproxy port listen: ", port)
 
 	ProxyServerMap = make(map[string]*service.ProxyServer)
+	go activeCheck()
+
 	http.HandleFunc("/", proxyHandler)
 	http.HandleFunc("/gproxy/active", activeHandler)
 	http.HandleFunc("/gproxy/registry", registryHandler)

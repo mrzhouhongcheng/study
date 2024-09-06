@@ -96,12 +96,13 @@ func InitializeGProxy() {
 		log.Println("registry failed", err)
 		panic(0)
 	}
+	Active(host, port)
 	// 激活
 	go func() {
 		ticker := time.NewTicker(20 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			go Active(host, port)
+			Active(host, port)
 		}
 	}()
 }
