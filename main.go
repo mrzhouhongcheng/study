@@ -9,55 +9,29 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strconv"
-	"sync"
 	"time"
+
+	"com.zhouhc.study/service"
 )
 
-type ProxyServer struct {
-	Host       string    `json:"host"`
-	Port       int       `json:"port"`
-	LastAction time.Time `json:"lastAction"`
-	IsAction   bool      `json:"isAction"`
-
-	mu sync.Mutex
-}
-
-func NewProxyServerByModel(model ProxyServerModel) *ProxyServer {
-	return &ProxyServer{
-		Host: model.Host,
-		Port: model.Port,
-	}
-}
-
-type ProxyServerModel struct {
-	Host        string    `json:"host"`
-	Port        int       `json:"port"`
-	RequestTime time.Time `json:"requestTime"`
-}
-
-var ProxyServerMap map[string]*ProxyServer
-
-func (p *ProxyServer) getKey() string {
-	return p.Host + ":" + strconv.Itoa(p.Port)
-}
+var ProxyServerMap map[string]*service.ProxyServer
 
 // 注册
 func registryHandler(w http.ResponseWriter, r *http.Request) {
-	var model ProxyServerModel
+	var model service.ProxyServerModel
 	err := json.NewDecoder(r.Body).Decode(&model)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	server := NewProxyServerByModel(model)
-	key := server.getKey()
+	server := service.NewProxyServerByModel(model)
+	key := server.GetKey()
 	if _, ok := ProxyServerMap[key]; ok {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	server.mu.Lock()
-	defer server.mu.Unlock()
+	server.Mu.Lock()
+	defer server.Mu.Unlock()
 	server.IsAction = false
 	ProxyServerMap[key] = server
 
@@ -66,7 +40,7 @@ func registryHandler(w http.ResponseWriter, r *http.Request) {
 
 // 激活
 func activeHandler(w http.ResponseWriter, r *http.Request) {
-	var model ProxyServerModel
+	var model service.ProxyServerModel
 	err := json.NewDecoder(r.Body).Decode(&model)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -77,14 +51,20 @@ func activeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request time", http.StatusInternalServerError)
 		return
 	}
-	server := NewProxyServerByModel(model)
-	key := server.getKey()
+	server := service.NewProxyServerByModel(model)
+	key := server.GetKey()
 	if proxyServer, ok := ProxyServerMap[key]; ok {
-		proxyServer.mu.Lock()
-		defer proxyServer.mu.Unlock()
+		proxyServer.Mu.Lock()
+		defer proxyServer.Mu.Unlock()
 		proxyServer.LastAction = time.Now()
+		proxyServer.IsAction = true
 		w.WriteHeader(http.StatusOK)
 	} else {
+		server.Mu.Lock()
+		defer server.Mu.Unlock()
+		server.IsAction = false
+		server.LastAction = time.Now()
+		ProxyServerMap[key] = server
 		http.Error(w, "proxy server not registry", http.StatusInternalServerError)
 	}
 }
@@ -96,8 +76,8 @@ func geturlByProxyServerMap() (string, error) {
 	}
 	keys := make([]string, 0)
 	for key, proxy := range ProxyServerMap {
-		proxy.mu.Lock()
-		defer proxy.mu.Unlock()
+		proxy.Mu.Lock()
+		defer proxy.Mu.Unlock()
 		if proxy.IsAction {
 			keys = append(keys, key)
 		}
@@ -111,7 +91,12 @@ func geturlByProxyServerMap() (string, error) {
 }
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
-	targetURL := "http://10.88.19.91"
+
+	targetURL, err := geturlByProxyServerMap()
+	if err != nil {
+		http.Error(w, "Invalid target URL", http.StatusInternalServerError)
+		return
+	}
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		http.Error(w, "Invalid target url", http.StatusInternalServerError)
@@ -153,10 +138,10 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	ProxyServerMap = make(map[string]*ProxyServer)
+	ProxyServerMap = make(map[string]*service.ProxyServer)
 	http.HandleFunc("/", proxyHandler)
-	http.HandleFunc("/active", activeHandler)
-	http.HandleFunc("/registry", registryHandler)
+	http.HandleFunc("/gproxy/active", activeHandler)
+	http.HandleFunc("/gproxy/registry", registryHandler)
 
 	log.Println("Proxy server is running or port 9999....")
 	err := http.ListenAndServe(":9999", nil)
