@@ -8,7 +8,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"com.zhouhc.study/service"
@@ -104,5 +107,17 @@ func InitializeGProxy() {
 		for range ticker.C {
 			Active(host, port)
 		}
+	}()
+
+	// 程序退出时需要执行
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+        sig := <-sigChan
+		fmt.Println("收到信号:", sig)
+		fmt.Println("remove server")
+
+		os.Exit(0)
 	}()
 }

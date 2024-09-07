@@ -18,6 +18,8 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	defer fmt.Println("out server is listening")
+
 	viper.SetConfigName("application-cli.yml")
 	viper.SetConfigType("yml")
 	viper.AddConfigPath(".")
