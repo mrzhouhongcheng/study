@@ -1,0 +1,203 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	fileserver "com.zhouhc.study/src/fileServer"
+	"com.zhouhc.study/src/util"
+)
+
+var host string
+
+func readHost() {
+	configPath := filepath.Join(os.TempDir(), "pclient", "config")
+
+	if util.FileExists(configPath) {
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return
+		}
+		host = string(data)
+	}
+}
+
+func main() {
+	readHost()
+
+	checkJsonPath := flag.String("f", "", "指定down.json文件,下载数据")
+	url := flag.String("d", "", "指定文件下载的url地址")
+	output := flag.String("o", "", "指定文件的下载路径")
+	downHost := flag.String("h", "", "指定服务器的ip地址")
+	flag.Parse()
+
+	if *downHost == "" && host == "" {
+		fmt.Println("未指定服务器地址，启动失败")
+		flag.PrintDefaults()
+		os.Exit(1)
+	} else if *downHost != "" {
+		util.WriteFile(filepath.Join(os.TempDir(), "pclient", "config"), []byte(*downHost))
+		host = *downHost
+	}
+
+	if *checkJsonPath == "" && *url == "" {
+		fmt.Println("Usage: down [option(-d|-c|-h)] <data.json>")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	if *url != "" {
+		err := downJSON(*url, *output)
+		dwPath := filepath.Join(*output, "down.json")
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			os.Exit(1)
+		}
+		err = checkParts(dwPath, *output)
+		if err != nil {
+			fmt.Printf("checkParts failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	if *checkJsonPath != "" {
+		err := checkParts(*checkJsonPath, *output)
+		if err != nil {
+			fmt.Printf("checkParts failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+}
+
+func downJSON(url, output string) error {
+	params := make(map[string]string)
+	params["filePath"] = url
+
+	params_str, err := json.Marshal(params)
+	if err != nil {
+		fmt.Printf("Unable to marshal params: %v \n", err)
+		return err
+	}
+	res, err := http.Post(
+		fmt.Sprintf("http://%s:8889/down", host),
+		"application/json", strings.NewReader(string(params_str)))
+	if err != nil {
+		fmt.Printf("Post request failed: %s\n", err)
+		return err
+	}
+	defer res.Body.Close()
+	dw, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Printf("Read response failed: %s\n", err)
+		return err
+	}
+	return util.WriteFile(filepath.Join(output, "down.json"), dw)
+}
+
+// dwPath : down.json 文件夹的路径地址
+func checkParts(dwPath, output string) error {
+	downJson, err := fileserver.GetDownjsonByPath(dwPath)
+	if err != nil {
+		fmt.Printf("Get down.json failed: %v\n", err)
+		return err
+	}
+	var wg sync.WaitGroup
+	resChan := make(chan string, 20)
+	for _, path := range downJson.FileList {
+		resChan <- path
+		wg.Add(1)
+		go func(outDir, _path string) {
+			defer wg.Done()
+			defer func() { <-resChan }()
+			// 获取文件在本地的路径
+			part_path := filepath.Join(outDir, filepath.Base(_path))
+			if !util.FileExists(part_path) {
+				params := url.Values{}
+				params.Add("part", _path)
+				url := fmt.Sprintf("http://%s:8889/downpart?%s", host, params.Encode())
+				err = getFileByUrl(url, part_path+".tmp")
+				if err != nil {
+					fmt.Println("Error getting file from URL: ", err)
+					return
+				}
+				fmt.Printf("download file: %s \t %s\n", part_path+".tmp", part_path)
+				os.Rename(part_path+".tmp", part_path)
+			}
+		}(output, path)
+	}
+	wg.Wait()
+	// 合并文件
+	err = fileserver.Merge(dwPath, output)
+	if err != nil {
+		fmt.Printf("Merge file failed: %v\n", err)
+		return err
+	}
+	log.Printf("校验文件:%s\n", filepath.Join(output, downJson.FileName))
+	// 校验文件的hashkey
+	code, err := util.CalculateFileHash(filepath.Join(output, downJson.FileName))
+	if err != nil {
+		fmt.Println("Error calculating file hash from file: ", err)
+		return err
+	}
+	if code != downJson.HashKey {
+		log.Printf("文件校验失败: 计算结果: %s, 期待结果: %s\n", code, downJson.HashKey)
+		return errors.New("hash key not supported")
+	}
+	log.Printf("文件校验成功: %s\n", code)
+	// 删除文件夹中的down.json和part文件
+	log.Printf("清理down.json 和 临时文件")
+	removeDownInfo(dwPath, output, removeServerTempFile)
+	return nil
+}
+
+func removeDownInfo(dwpath, output string, removeServerTempFileFunc func(string) error) error {
+	downJson, err := fileserver.GetDownjsonByPath(dwpath)
+	if err != nil {
+		fmt.Println("get down json failed: ", err)
+		return err
+	}
+	for _, path := range downJson.FileList {
+		os.Remove(filepath.Join(output, filepath.Base(path)))
+	}
+	removeServerTempFileFunc(dwpath)
+	// 删除json文件
+	os.Remove(dwpath)
+	return nil
+}
+
+// removeServerTempFile removes the temporary
+func removeServerTempFile(dwPath string) error {
+	// 获取downJons的信息
+	dj, _ := fileserver.GetDownjsonByPath(dwPath)
+	params := make(map[string]string)
+	params["removePath"] = dj.FolderPath
+
+	params_str, err := json.Marshal(params)
+	if err != nil {
+		fmt.Printf("Unable to marshal params: %v \n", err)
+		return err
+	}
+	http.Post(
+		fmt.Sprintf("http://%s:8889/remove", host),
+		"application/json", strings.NewReader(string(params_str)))
+	return nil
+}
+
+func getFileByUrl(url, output string) error {
+	res, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	return util.WriteFileByReader(output, res.Body)
+}
