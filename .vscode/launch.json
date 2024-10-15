@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "java",
+            "name": "A",
+            "request": "launch",
+            "mainClass": "A",
+            "projectName": "study_b9dc2271"
+        },
+        {
             "name": "Launch Package",
             "type": "go",
             "request": "launch",
